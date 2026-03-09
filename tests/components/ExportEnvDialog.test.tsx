@@ -118,4 +118,13 @@ describe('ExportEnvDialog', () => {
     fireEvent.click(screen.getByText('Close'));
     expect(props.onClose).toHaveBeenCalledTimes(1);
   });
+
+  it('skips keys with <NA> value for the selected environment', () => {
+    const kvNA: KeyValue = { id: 10, key_id: 1, environment_id: 1, value: '<NA>', updated_at: '' };
+    renderDialog({ keyValues: [kvNA, kvDevB] });
+    const textarea = screen.getByRole('textbox') as HTMLTextAreaElement;
+    expect(textarea.value).not.toContain('API_KEY');
+    expect(textarea.value).toContain('DB_HOST=localhost');
+    expect(screen.getByText(/1 entry/)).toBeTruthy();
+  });
 });

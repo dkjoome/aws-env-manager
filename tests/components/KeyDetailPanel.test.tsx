@@ -446,6 +446,102 @@ describe('KeyDetailPanel locked state', () => {
   });
 });
 
+describe('KeyDetailPanel N/A marking', () => {
+  it('renders N/A button for each environment when not locked', () => {
+    render(
+      <KeyDetailPanel
+        envKey={makeKey()}
+        environments={[envDev, envProd]}
+        keyValues={[kvDev, kvProd]}
+        keyLinks={[]}
+        onSave={vi.fn()}
+        onClose={vi.fn()}
+        onDeleteLink={vi.fn()}
+        onCreateLink={vi.fn()}
+      />
+    );
+    expect(screen.getByLabelText('Mark N/A for dev')).toBeTruthy();
+    expect(screen.getByLabelText('Mark N/A for prod')).toBeTruthy();
+  });
+
+  it('clicking N/A button sets value to <NA> in save payload', () => {
+    const onSave = vi.fn();
+    render(
+      <KeyDetailPanel
+        envKey={makeKey()}
+        environments={[envDev, envProd]}
+        keyValues={[kvDev, kvProd]}
+        keyLinks={[]}
+        onSave={onSave}
+        onClose={vi.fn()}
+        onDeleteLink={vi.fn()}
+        onCreateLink={vi.fn()}
+      />
+    );
+    fireEvent.click(screen.getByLabelText('Mark N/A for dev'));
+    fireEvent.click(screen.getByText('Save'));
+    const [, , values] = onSave.mock.calls[0];
+    expect(values[100]).toBe('<NA>');
+    expect(values[101]).toBe('prod-value');
+  });
+
+  it('shows Clear button and disabled input when value is <NA>', () => {
+    const naKv: KeyValue = { id: 1, key_id: 1, environment_id: 100, value: '<NA>', updated_at: '' };
+    render(
+      <KeyDetailPanel
+        envKey={makeKey()}
+        environments={[envDev]}
+        keyValues={[naKv]}
+        keyLinks={[]}
+        onSave={vi.fn()}
+        onClose={vi.fn()}
+        onDeleteLink={vi.fn()}
+        onCreateLink={vi.fn()}
+      />
+    );
+    expect(screen.getByLabelText('Clear N/A for dev')).toBeTruthy();
+    expect((screen.getByLabelText('dev') as HTMLInputElement).disabled).toBe(true);
+    expect((screen.getByLabelText('dev') as HTMLInputElement).value).toBe('N/A');
+  });
+
+  it('clicking Clear reverts value to null', () => {
+    const naKv: KeyValue = { id: 1, key_id: 1, environment_id: 100, value: '<NA>', updated_at: '' };
+    const onSave = vi.fn();
+    render(
+      <KeyDetailPanel
+        envKey={makeKey()}
+        environments={[envDev]}
+        keyValues={[naKv]}
+        keyLinks={[]}
+        onSave={onSave}
+        onClose={vi.fn()}
+        onDeleteLink={vi.fn()}
+        onCreateLink={vi.fn()}
+      />
+    );
+    fireEvent.click(screen.getByLabelText('Clear N/A for dev'));
+    fireEvent.click(screen.getByText('Save'));
+    const [, , values] = onSave.mock.calls[0];
+    expect(values[100]).toBeNull();
+  });
+
+  it('hides N/A button when key is locked', () => {
+    render(
+      <KeyDetailPanel
+        envKey={makeKey({ is_locked: 1 })}
+        environments={[envDev]}
+        keyValues={[kvDev]}
+        keyLinks={[]}
+        onSave={vi.fn()}
+        onClose={vi.fn()}
+        onDeleteLink={vi.fn()}
+        onCreateLink={vi.fn()}
+      />
+    );
+    expect(screen.queryByLabelText('Mark N/A for dev')).toBeNull();
+  });
+});
+
 describe('KeyDetailPanel create link button', () => {
   it('renders + Link button when not locked', () => {
     render(

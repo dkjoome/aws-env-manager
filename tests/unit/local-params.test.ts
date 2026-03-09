@@ -46,6 +46,36 @@ describe('buildLocalParams', () => {
     expect(result).toHaveLength(0);
   });
 
+  it('skips <NA> values when skipNullValues is true (push mode)', () => {
+    const naKv: KeyValue = { ...kv, value: '<NA>' };
+    const result = buildLocalParams('ns', 'proj', [key], [env], [naKv], {
+      skipNullValues: true, includeMetadata: true,
+    });
+    expect(result).toHaveLength(0);
+  });
+
+  it('includes <NA> values when skipNullValues is false (pull mode)', () => {
+    const naKv: KeyValue = { ...kv, value: '<NA>' };
+    const result = buildLocalParams('ns', 'proj', [key], [env], [naKv], {
+      skipNullValues: false, includeMetadata: false,
+    });
+    expect(result).toHaveLength(1);
+    expect(result[0].value).toBe('<NA>');
+  });
+
+  it('skips only <NA> entries among multiple keys', () => {
+    const env2: Environment = { id: 2, namespace_id: 1, name: 'prod', sort_order: 1 };
+    const kvs: KeyValue[] = [
+      { id: 100, key_id: 10, environment_id: 1, value: 'secret', updated_at: '' },
+      { id: 101, key_id: 10, environment_id: 2, value: '<NA>', updated_at: '' },
+    ];
+    const result = buildLocalParams('ns', 'proj', [key], [env, env2], kvs, {
+      skipNullValues: true, includeMetadata: true,
+    });
+    expect(result).toHaveLength(1);
+    expect(result[0].path).toBe('/ns/proj/dev/API_KEY');
+  });
+
   it('handles multiple keys and environments', () => {
     const env2: Environment = { id: 2, namespace_id: 1, name: 'prod', sort_order: 1 };
     const key2: EnvKey = { ...key, id: 20, name: 'DB_HOST', is_secure: 0 };

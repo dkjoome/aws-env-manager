@@ -23,6 +23,7 @@ This is **not a security tool**. It solves the operational challenge of managing
 - **Cross-key links** — declare that two keys across projects must have the same value; broken links surface as validation errors
 - **Secure keys** — flag a key as `SecureString` for SSM encryption
 - **Key locking** — prevent accidental edits to critical keys; locked keys block deletion and pull operations
+- **Not Applicable (N/A) marking** — mark a key as not applicable for specific environments; N/A keys are skipped during push and export
 - **Namespace → Project → Environment** hierarchy for organizing large-scale configurations
 
 ---

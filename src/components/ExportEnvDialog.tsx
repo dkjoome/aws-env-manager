@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { EnvKey, Environment, KeyValue } from '../types';
+import { NA_VALUE } from '../types';
 
 interface ExportEnvDialogProps {
   keys: EnvKey[];
@@ -16,7 +17,7 @@ export function ExportEnvDialog({ keys, environments, keyValues, onClose }: Expo
   const lines: string[] = [];
   for (const key of keys) {
     const kv = keyValues.find((v) => v.key_id === key.id && v.environment_id === envId);
-    if (!kv) continue; // unset — skip
+    if (!kv || kv.value === NA_VALUE) continue; // unset or N/A — skip
     const value = kv.value ?? '';
     let line = `${key.name}=${value}`;
     if (includeDescriptions && key.description) {
