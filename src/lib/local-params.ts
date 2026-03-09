@@ -1,4 +1,5 @@
 import type { EnvKey, KeyValue, Environment } from '../types';
+import { NA_VALUE } from '../types';
 import { buildPath } from './path-builder';
 
 export interface LocalParam {
@@ -34,7 +35,7 @@ export function buildLocalParams(
         (v) => v.key_id === key.id && v.environment_id === env.id,
       );
       if (!kv) continue;
-      if (opts.skipNullValues && kv.value === null) continue;
+      if (opts.skipNullValues && (kv.value === null || kv.value === NA_VALUE)) continue;
       const entry: LocalParam = {
         path: buildPath(namespaceName, projectName, env.name, key.name),
         value: kv.value,

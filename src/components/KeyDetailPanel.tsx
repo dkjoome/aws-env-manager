@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import type { EnvKey, Environment, KeyValue, KeyLink } from '../types';
+import { NA_VALUE } from '../types';
 
 interface KeyDetailPanelProps {
   envKey: EnvKey | null;
@@ -179,25 +180,51 @@ export function KeyDetailPanel({
           )}
         </div>
 
-        {environments.map((env) => (
-          <div key={env.id} className="form-group">
-            <label htmlFor={`env-val-${env.id}`}>{env.name}</label>
-            <input
-              id={`env-val-${env.id}`}
-              type="text"
-              value={values[env.id] ?? ''}
-              onChange={(e) =>
-                setValues((v) => ({ ...v, [env.id]: e.target.value.trim() || null }))
-              }
-              className="form-input"
-              placeholder={`Value for ${env.name}`}
-              autoCapitalize="none"
-              autoCorrect="off"
-              spellCheck={false}
-              disabled={isLocked}
-            />
-          </div>
-        ))}
+        {environments.map((env) => {
+          const isNA = values[env.id] === NA_VALUE;
+          return (
+            <div key={env.id} className="form-group">
+              <label htmlFor={`env-val-${env.id}`}>{env.name}</label>
+              <div className="env-value-row">
+                <input
+                  id={`env-val-${env.id}`}
+                  type="text"
+                  value={isNA ? 'N/A' : (values[env.id] ?? '')}
+                  onChange={(e) =>
+                    setValues((v) => ({ ...v, [env.id]: e.target.value.trim() || null }))
+                  }
+                  className={`form-input${isNA ? ' na-input' : ''}`}
+                  placeholder={`Value for ${env.name}`}
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  disabled={isLocked || isNA}
+                />
+                {!isLocked && (
+                  isNA ? (
+                    <button
+                      type="button"
+                      className="action-btn na-btn"
+                      onClick={() => setValues((v) => ({ ...v, [env.id]: null }))}
+                      aria-label={`Clear N/A for ${env.name}`}
+                    >
+                      Clear
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="action-btn na-btn"
+                      onClick={() => setValues((v) => ({ ...v, [env.id]: NA_VALUE }))}
+                      aria-label={`Mark N/A for ${env.name}`}
+                    >
+                      N/A
+                    </button>
+                  )
+                )}
+              </div>
+            </div>
+          );
+        })}
 
         <div className="section-title-row">
           <h4 className="section-title">Links</h4>

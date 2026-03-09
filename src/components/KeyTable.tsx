@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import type { EnvKey, Environment, KeyValue, KeyLink, ValidationError } from '../types';
+import { NA_VALUE } from '../types';
 
 interface KeyTableProps {
   keys: EnvKey[];
@@ -124,7 +125,7 @@ export function KeyTable({
         if (key.name.toLowerCase().includes(query)) return true;
         for (const env of environments) {
           const kv = valueMap.get(`${key.id}:${env.id}`);
-          if (kv?.value && kv.value.toLowerCase().includes(query)) return true;
+          if (kv?.value && kv.value !== NA_VALUE && kv.value.toLowerCase().includes(query)) return true;
         }
         return false;
       })
@@ -175,7 +176,7 @@ export function KeyTable({
     const values = new Set<string>();
     for (const env of environments) {
       const kv = valueMap.get(`${key.id}:${env.id}`);
-      if (kv?.value != null) values.add(kv.value);
+      if (kv?.value != null && kv.value !== NA_VALUE) values.add(kv.value);
     }
     return values.size > 1;
   }
@@ -372,17 +373,20 @@ export function KeyTable({
                   const kv = valueMap.get(mapKey);
                   const hasRecord = kv !== undefined;
                   const value = hasRecord ? kv!.value : undefined;
+                  const isNAValue = value === NA_VALUE;
 
                   const copyIcon = copiedCell === mapKey
                     ? <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.75.75 0 0 1 1.06-1.06L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0z"/></svg>
                     : <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><rect x="5" y="1" width="9" height="11" rx="1.5" fill="none" stroke="currentColor" strokeWidth="1.5"/><rect x="2" y="4" width="9" height="11" rx="1.5" fill="none" stroke="currentColor" strokeWidth="1.5"/></svg>;
 
-                  const isMissing = !hasRecord || !value;
-                  const displayValue = isMasked && value ? '••••••' : value;
+                  const isMissing = !hasRecord || !value || isNAValue;
+                  const displayValue = isMasked && value && !isNAValue ? '••••••' : value;
 
                   return (
-                    <td key={env.id} className={`col-env${differs ? ' value-differs' : ''}${isMissing ? ' value-missing' : ''}`}>
-                      {!hasRecord ? (
+                    <td key={env.id} className={`col-env${differs ? ' value-differs' : ''}${isMissing ? ' value-missing' : ''}${isNAValue ? ' value-na' : ''}`}>
+                      {isNAValue ? (
+                        <span className="na-badge">NA</span>
+                      ) : !hasRecord ? (
                         <span className="value-unset">—</span>
                       ) : !value ? (
                         <span className="value-empty">NULL</span>

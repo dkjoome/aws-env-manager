@@ -529,6 +529,45 @@
   border-left: 3px solid var(--danger);
 }
 
+.col-env.value-na {
+  background: #f3f4f6;
+  opacity: 0.6;
+  cursor: default;
+}
+
+.na-badge {
+  display: inline-block;
+  background: var(--danger);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 3px;
+  letter-spacing: 0.5px;
+}
+
+/* Detail panel: env value row with N/A button */
+.env-value-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.env-value-row .form-input {
+  flex: 1;
+}
+
+.na-btn {
+  flex-shrink: 0;
+  font-size: 11px;
+  padding: 4px 8px;
+}
+
+.na-input {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
 .value-text {
   font-family: 'SF Mono', 'Fira Code', monospace;
   font-size: 12px;

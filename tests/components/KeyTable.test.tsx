@@ -391,6 +391,55 @@ describe('KeyTable masking', () => {
   });
 });
 
+describe('KeyTable N/A values', () => {
+  const kvNA: KeyValue = { id: 10, key_id: 1, environment_id: 1, value: '<NA>', updated_at: '' };
+
+  it('renders NA badge for <NA> value', () => {
+    renderTable({ keys: [keyA], keyValues: [kvNA] });
+    expect(screen.getByText('NA')).toBeTruthy();
+    const badge = screen.getByText('NA');
+    expect(badge.classList.contains('na-badge')).toBe(true);
+  });
+
+  it('adds value-na class to NA cells', () => {
+    renderTable({ keys: [keyA], keyValues: [kvNA] });
+    const row = screen.getByText('API_KEY').closest('tr')!;
+    const envCells = row.querySelectorAll('.col-env');
+    expect(envCells[0].classList.contains('value-na')).toBe(true);
+  });
+
+  it('does not render copy button for NA cells', () => {
+    renderTable({ keys: [keyA], keyValues: [kvNA] });
+    expect(screen.queryByLabelText('Copy API_KEY for dev')).toBeNull();
+  });
+
+  it('hasDifferingValues ignores NA values', () => {
+    // dev=<NA>, prod=secret → only 1 real value → no differs
+    const kvs: KeyValue[] = [
+      { id: 10, key_id: 1, environment_id: 1, value: '<NA>', updated_at: '' },
+      { id: 11, key_id: 1, environment_id: 2, value: 'secret', updated_at: '' },
+    ];
+    renderTable({ keys: [keyA], keyValues: kvs });
+    const row = screen.getByText('API_KEY').closest('tr')!;
+    const envCells = row.querySelectorAll('.col-env');
+    expect(envCells[1].classList.contains('value-differs')).toBe(false);
+  });
+
+  it('search does not match NA values', () => {
+    renderTable({ keys: [keyA, keyB], keyValues: [kvNA, kvDevB] });
+    fireEvent.change(screen.getByPlaceholderText('Search keys and values…'), { target: { value: '<NA>' } });
+    expect(screen.queryByText('API_KEY')).toBeNull();
+    expect(screen.queryByText('DB_HOST')).toBeNull();
+  });
+
+  it('treats NA cell as value-missing', () => {
+    renderTable({ keys: [keyA], keyValues: [kvNA] });
+    const row = screen.getByText('API_KEY').closest('tr')!;
+    const envCells = row.querySelectorAll('.col-env');
+    expect(envCells[0].classList.contains('value-missing')).toBe(true);
+  });
+});
+
 describe('KeyTable lock', () => {
   it('renders lock icon for all keys', () => {
     renderTable();

@@ -1,3 +1,6 @@
+/** Sentinel value stored in key_values.value to mark a key as not applicable for an environment. */
+export const NA_VALUE = '<NA>';
+
 export interface Namespace {
   id: number;
   name: string;
