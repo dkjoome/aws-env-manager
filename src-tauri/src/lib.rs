@@ -5,6 +5,7 @@ use aws_sdk_s3::Client as S3Client;
 use aws_sdk_ssm::types::ParameterType;
 use aws_sdk_ssm::Client as SsmClient;
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 
 // ── Shared types ─────────────────────────────────────────────────────────────
 
@@ -90,6 +91,35 @@ async fn s3_client(
 /// HTTP status, credential errors, etc.) instead of the generic Display.
 fn detailed_aws_error<E: std::fmt::Debug>(err: &E) -> String {
     format!("{err:?}")
+}
+
+fn is_throttling_error(msg: &str) -> bool {
+    msg.contains("ThrottlingException") || msg.contains("Rate exceeded")
+}
+
+/// Retries `op` up to `max_attempts` times on throttling errors, sleeping
+/// `delay_fn(attempt)` milliseconds before each retry (attempt starts at 1).
+async fn with_retry<F, Fut>(
+    max_attempts: u32,
+    delay_fn: impl Fn(u32) -> u64,
+    op: F,
+) -> Result<(), String>
+where
+    F: Fn() -> Fut,
+    Fut: std::future::Future<Output = Result<(), String>>,
+{
+    let mut last_err = String::new();
+    for attempt in 0..max_attempts {
+        if attempt > 0 {
+            tokio::time::sleep(Duration::from_millis(delay_fn(attempt))).await;
+        }
+        match op().await {
+            Ok(()) => return Ok(()),
+            Err(e) if is_throttling_error(&e) => last_err = e,
+            Err(e) => return Err(e),
+        }
+    }
+    Err(last_err)
 }
 
 // ── Tauri commands ────────────────────────────────────────────────────────────
@@ -198,6 +228,8 @@ async fn ssm_apply_diff(
     let mut updated = 0u32;
     let mut deleted = 0u32;
 
+    let backoff = |attempt: u32| 500 * (1u64 << (attempt - 1)); // 500, 1000, 2000, 4000 ms
+
     for item in &diff {
         match item.action.as_str() {
             "create" | "update" => {
@@ -207,18 +239,19 @@ async fn ssm_apply_diff(
                 } else {
                     ParameterType::String
                 };
-                let mut req = client
-                    .put_parameter()
-                    .name(&item.path)
-                    .value(value)
-                    .r#type(param_type)
-                    .overwrite(true);
-                if let Some(desc) = &item.description {
-                    req = req.description(desc);
-                }
-                req.send()
-                    .await
-                    .map_err(|e| detailed_aws_error(&e))?;
+                with_retry(5, backoff, || {
+                    let mut req = client
+                        .put_parameter()
+                        .name(&item.path)
+                        .value(value)
+                        .r#type(param_type.clone())
+                        .overwrite(true);
+                    if let Some(desc) = &item.description {
+                        req = req.description(desc);
+                    }
+                    async move { req.send().await.map(|_| ()).map_err(|e| detailed_aws_error(&e)) }
+                })
+                .await?;
                 if item.action == "create" {
                     created += 1;
                 } else {
@@ -226,12 +259,16 @@ async fn ssm_apply_diff(
                 }
             }
             "delete" => {
-                client
-                    .delete_parameter()
-                    .name(&item.path)
-                    .send()
-                    .await
-                    .map_err(|e| detailed_aws_error(&e))?;
+                with_retry(5, backoff, || async {
+                    client
+                        .delete_parameter()
+                        .name(&item.path)
+                        .send()
+                        .await
+                        .map(|_| ())
+                        .map_err(|e| detailed_aws_error(&e))
+                })
+                .await?;
                 deleted += 1;
             }
             _ => {}
@@ -409,5 +446,99 @@ mod tests {
         );
         // Clean up so other tests aren't affected
         std::env::remove_var("AWS_SHARED_CREDENTIALS_FILE");
+    }
+
+    // ── is_throttling_error ───────────────────────────────────────────────────
+
+    #[test]
+    fn throttling_detected_by_exception_name() {
+        assert!(is_throttling_error("ThrottlingException: Rate exceeded"));
+    }
+
+    #[test]
+    fn throttling_detected_by_rate_exceeded_message() {
+        assert!(is_throttling_error("Rate exceeded"));
+    }
+
+    #[test]
+    fn throttling_detected_inside_larger_error_string() {
+        let msg = r#"ServiceError { source: ThrottlingException, message: "Rate exceeded" }"#;
+        assert!(is_throttling_error(msg));
+    }
+
+    #[test]
+    fn non_throttling_errors_not_detected() {
+        assert!(!is_throttling_error("AccessDeniedException"));
+        assert!(!is_throttling_error("ParameterNotFound"));
+        assert!(!is_throttling_error(""));
+    }
+
+    // ── with_retry ────────────────────────────────────────────────────────────
+
+    #[tokio::test]
+    async fn retry_succeeds_on_first_attempt() {
+        use std::sync::atomic::{AtomicU32, Ordering};
+        use std::sync::Arc;
+        let calls = Arc::new(AtomicU32::new(0));
+        let c = calls.clone();
+        let result = with_retry(5, |_| 0, move || {
+            c.fetch_add(1, Ordering::SeqCst);
+            async { Ok(()) }
+        })
+        .await;
+        assert!(result.is_ok());
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn retry_succeeds_after_throttle_then_ok() {
+        use std::sync::atomic::{AtomicU32, Ordering};
+        use std::sync::Arc;
+        let calls = Arc::new(AtomicU32::new(0));
+        let c = calls.clone();
+        let result = with_retry(5, |_| 0, move || {
+            let n = c.fetch_add(1, Ordering::SeqCst);
+            async move {
+                if n < 2 {
+                    Err("ThrottlingException: Rate exceeded".to_string())
+                } else {
+                    Ok(())
+                }
+            }
+        })
+        .await;
+        assert!(result.is_ok());
+        assert_eq!(calls.load(Ordering::SeqCst), 3);
+    }
+
+    #[tokio::test]
+    async fn retry_exhausted_returns_last_throttling_error() {
+        use std::sync::atomic::{AtomicU32, Ordering};
+        use std::sync::Arc;
+        let calls = Arc::new(AtomicU32::new(0));
+        let c = calls.clone();
+        let result = with_retry(3, |_| 0, move || {
+            c.fetch_add(1, Ordering::SeqCst);
+            async { Err("ThrottlingException: Rate exceeded".to_string()) }
+        })
+        .await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("ThrottlingException"));
+        assert_eq!(calls.load(Ordering::SeqCst), 3);
+    }
+
+    #[tokio::test]
+    async fn retry_does_not_retry_non_throttling_errors() {
+        use std::sync::atomic::{AtomicU32, Ordering};
+        use std::sync::Arc;
+        let calls = Arc::new(AtomicU32::new(0));
+        let c = calls.clone();
+        let result = with_retry(5, |_| 0, move || {
+            c.fetch_add(1, Ordering::SeqCst);
+            async { Err("AccessDeniedException".to_string()) }
+        })
+        .await;
+        assert!(result.is_err());
+        assert_eq!(calls.load(Ordering::SeqCst), 1, "should not retry non-throttling errors");
     }
 }
