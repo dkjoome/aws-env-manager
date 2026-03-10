@@ -15,6 +15,8 @@ pub struct RemoteParam {
     pub path: String,
     pub value: String,
     pub description: Option<String>,
+    #[serde(rename = "isSecure")]
+    pub is_secure: bool,
 }
 
 /// One item from the diff computed on the frontend.
@@ -154,10 +156,12 @@ async fn ssm_get_params(
 
         for param in resp.parameters() {
             if let (Some(name), Some(value)) = (param.name(), param.value()) {
+                let is_secure = param.r#type() == Some(&ParameterType::SecureString);
                 results.push(RemoteParam {
                     path: name.to_owned(),
                     value: value.to_owned(),
                     description: None,
+                    is_secure,
                 });
             }
         }
@@ -381,12 +385,14 @@ mod tests {
             path: "/ns/proj/dev/API_KEY".to_string(),
             value: "secret123".to_string(),
             description: None,
+            is_secure: false,
         };
         let json = serde_json::to_string(&param).unwrap();
         let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed["path"], "/ns/proj/dev/API_KEY");
         assert_eq!(parsed["value"], "secret123");
         assert!(parsed["description"].is_null());
+        assert_eq!(parsed["isSecure"], false);
     }
 
     #[test]
@@ -395,12 +401,14 @@ mod tests {
             path: "/ns/proj/dev/API_KEY".to_string(),
             value: "secret123".to_string(),
             description: Some("The API key".to_string()),
+            is_secure: true,
         };
         let json = serde_json::to_string(&param).unwrap();
         let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed["path"], "/ns/proj/dev/API_KEY");
         assert_eq!(parsed["value"], "secret123");
         assert_eq!(parsed["description"], "The API key");
+        assert_eq!(parsed["isSecure"], true);
     }
 
     // ── ApplyDiffResult serialization ────────────────────────────────────────

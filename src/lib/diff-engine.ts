@@ -5,6 +5,7 @@ export interface RemoteParam {
   value: string;
   description?: string | null;
   lastModified?: Date;
+  isSecure?: boolean;
 }
 
 export interface LocalParam {
@@ -57,7 +58,7 @@ export function computeDiff(
         isSecure: local.isSecure,
         description: local.description,
       });
-    } else if (remote.value !== localVal) {
+    } else if (remote.value !== localVal || !!local.isSecure !== !!remote.isSecure) {
       diff.push({
         action: 'update',
         path,
