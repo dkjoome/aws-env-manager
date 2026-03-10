@@ -123,6 +123,31 @@ describe('computeDiff', () => {
     const diff = computeDiff([l], [remote('/ns/p/dev/KEY', 'old')]);
     expect(diff[0].description).toBe('updated');
   });
+
+  it('detects type change from String to SecureString as update', () => {
+    const l: LocalParam = { path: '/ns/p/dev/KEY', value: 'same', keyId: 1, environmentId: 1, isSecure: true };
+    const r: RemoteParam = { path: '/ns/p/dev/KEY', value: 'same', isSecure: false };
+    const diff = computeDiff([l], [r]);
+    expect(diff).toHaveLength(1);
+    expect(diff[0].action).toBe('update');
+    expect(diff[0].isSecure).toBe(true);
+  });
+
+  it('detects type change from SecureString to String as update', () => {
+    const l: LocalParam = { path: '/ns/p/dev/KEY', value: 'same', keyId: 1, environmentId: 1, isSecure: false };
+    const r: RemoteParam = { path: '/ns/p/dev/KEY', value: 'same', isSecure: true };
+    const diff = computeDiff([l], [r]);
+    expect(diff).toHaveLength(1);
+    expect(diff[0].action).toBe('update');
+    expect(diff[0].isSecure).toBe(false);
+  });
+
+  it('no diff when value and type are both the same', () => {
+    const l: LocalParam = { path: '/ns/p/dev/KEY', value: 'same', keyId: 1, environmentId: 1, isSecure: true };
+    const r: RemoteParam = { path: '/ns/p/dev/KEY', value: 'same', isSecure: true };
+    const diff = computeDiff([l], [r]);
+    expect(diff).toHaveLength(0);
+  });
 });
 
 describe('computePullDiff (SSM wins)', () => {
