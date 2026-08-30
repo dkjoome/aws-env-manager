@@ -26,9 +26,10 @@ describe('SettingsScreen', () => {
     render(<SettingsScreen settings={null} isOpen={true} onSave={vi.fn()} onClose={vi.fn()} />);
     expect(screen.getByText('Settings')).toBeTruthy();
     expect(screen.getByLabelText('Credentials file path')).toBeTruthy();
-    expect(screen.getByLabelText('SSM profile name')).toBeTruthy();
     expect(screen.getByLabelText('S3 profile name')).toBeTruthy();
     expect(screen.getByLabelText('S3 bucket')).toBeTruthy();
+    // SSM profile moved to per-namespace credentials
+    expect(screen.queryByLabelText('SSM profile name')).toBeNull();
   });
 
   it('pre-fills inputs from settings prop', () => {
@@ -38,7 +39,6 @@ describe('SettingsScreen', () => {
     expect((screen.getByLabelText('Credentials file path') as HTMLInputElement).value).toBe(
       '/home/user/.aws/credentials'
     );
-    expect((screen.getByLabelText('SSM profile name') as HTMLInputElement).value).toBe('my-ssm');
     expect((screen.getByLabelText('S3 profile name') as HTMLInputElement).value).toBe('my-s3');
     expect((screen.getByLabelText('S3 bucket') as HTMLInputElement).value).toBe('my-bucket');
   });
@@ -60,13 +60,13 @@ describe('SettingsScreen', () => {
   it('calls onSave with form values when Save is clicked', () => {
     const onSave = vi.fn();
     render(<SettingsScreen settings={null} isOpen={true} onSave={onSave} onClose={vi.fn()} />);
-    fireEvent.change(screen.getByLabelText('SSM profile name'), {
+    fireEvent.change(screen.getByLabelText('S3 profile name'), {
       target: { value: 'new-profile' },
     });
     fireEvent.click(screen.getByText('Save'));
     expect(onSave).toHaveBeenCalledTimes(1);
     expect(onSave).toHaveBeenCalledWith(
-      expect.objectContaining({ ssm_profile: 'new-profile' })
+      expect.objectContaining({ s3_profile: 'new-profile' })
     );
   });
 
@@ -75,11 +75,11 @@ describe('SettingsScreen', () => {
     render(
       <SettingsScreen settings={defaultSettings} isOpen={true} onSave={onSave} onClose={vi.fn()} />
     );
-    // Clear the SSM profile field
-    fireEvent.change(screen.getByLabelText('SSM profile name'), { target: { value: '' } });
+    // Clear the S3 profile field
+    fireEvent.change(screen.getByLabelText('S3 profile name'), { target: { value: '' } });
     fireEvent.click(screen.getByText('Save'));
     expect(onSave).toHaveBeenCalledWith(
-      expect.objectContaining({ ssm_profile: null })
+      expect.objectContaining({ s3_profile: null })
     );
   });
 
@@ -87,11 +87,11 @@ describe('SettingsScreen', () => {
     const { rerender } = render(
       <SettingsScreen settings={null} isOpen={true} onSave={vi.fn()} onClose={vi.fn()} />
     );
-    expect((screen.getByLabelText('SSM profile name') as HTMLInputElement).value).toBe('');
+    expect((screen.getByLabelText('S3 profile name') as HTMLInputElement).value).toBe('');
 
     rerender(
       <SettingsScreen settings={defaultSettings} isOpen={true} onSave={vi.fn()} onClose={vi.fn()} />
     );
-    expect((screen.getByLabelText('SSM profile name') as HTMLInputElement).value).toBe('my-ssm');
+    expect((screen.getByLabelText('S3 profile name') as HTMLInputElement).value).toBe('my-s3');
   });
 });

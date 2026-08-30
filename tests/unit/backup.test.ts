@@ -46,7 +46,7 @@ describe('serializeBackup', () => {
 describe('compressBackup / decompressBackup', () => {
   it('compresses and decompresses back to original', () => {
     const data = makeBackupData({
-      namespaces: [{ id: 1, name: 'ns', created_at: '', updated_at: '' }],
+      namespaces: [{ id: 1, name: 'ns', ssm_profile: null, aws_region: null, created_at: '', updated_at: '' }],
     });
     const json = serializeBackup(data);
     const compressed = compressBackup(json);
@@ -173,7 +173,7 @@ describe('restoreDb', () => {
 
   it('restores namespaces, environments, projects, keys, and values', async () => {
     const backup = makeBackupData({
-      namespaces: [{ id: 1, name: 'ns1', created_at: '2026-01-01', updated_at: '2026-01-01' }],
+      namespaces: [{ id: 1, name: 'ns1', ssm_profile: 'my-profile', aws_region: 'ap-northeast-2', created_at: '2026-01-01', updated_at: '2026-01-01' }],
       environments: [{ id: 1, namespace_id: 1, name: 'dev', sort_order: 0 }],
       projects: [{ id: 1, namespace_id: 1, name: 'proj1', created_at: '2026-01-01', updated_at: '2026-01-01' }],
       keys: [{ id: 1, project_id: 1, name: 'API_KEY', description: 'desc', note: null, is_secure: 0, is_locked: 0, created_at: '2026-01-01', updated_at: '2026-01-01' }],
@@ -185,6 +185,8 @@ describe('restoreDb', () => {
     const namespaces = await getAllNamespaces(db);
     expect(namespaces).toHaveLength(1);
     expect(namespaces[0].name).toBe('ns1');
+    expect(namespaces[0].ssm_profile).toBe('my-profile');
+    expect(namespaces[0].aws_region).toBe('ap-northeast-2');
 
     const envs = await getEnvironmentsByNamespace(db, 1);
     expect(envs).toHaveLength(1);
@@ -212,7 +214,7 @@ describe('restoreDb', () => {
 
     // Restore different data
     const backup = makeBackupData({
-      namespaces: [{ id: 10, name: 'new-ns', created_at: '2026-01-01', updated_at: '2026-01-01' }],
+      namespaces: [{ id: 10, name: 'new-ns', ssm_profile: null, aws_region: null, created_at: '2026-01-01', updated_at: '2026-01-01' }],
       projects: [{ id: 10, namespace_id: 10, name: 'new-proj', created_at: '2026-01-01', updated_at: '2026-01-01' }],
       keys: [{ id: 10, project_id: 10, name: 'NEW_KEY', description: null, note: null, is_secure: 1, is_locked: 0, created_at: '2026-01-01', updated_at: '2026-01-01' }],
     });

@@ -10,7 +10,6 @@ interface SettingsScreenProps {
 
 export function SettingsScreen({ settings, isOpen, onSave, onClose }: SettingsScreenProps) {
   const [credentialsFilePath, setCredentialsFilePath] = useState('');
-  const [ssmProfile, setSsmProfile] = useState('');
   const [s3Profile, setS3Profile] = useState('');
   const [s3Bucket, setS3Bucket] = useState('');
   const [s3BackupPrefix, setS3BackupPrefix] = useState('');
@@ -19,7 +18,6 @@ export function SettingsScreen({ settings, isOpen, onSave, onClose }: SettingsSc
   useEffect(() => {
     if (!settings) return;
     setCredentialsFilePath(settings.credentials_file_path ?? '');
-    setSsmProfile(settings.ssm_profile ?? '');
     setS3Profile(settings.s3_profile ?? '');
     setS3Bucket(settings.s3_bucket ?? '');
     setS3BackupPrefix(settings.s3_backup_prefix ?? '');
@@ -31,7 +29,6 @@ export function SettingsScreen({ settings, isOpen, onSave, onClose }: SettingsSc
   function handleSave() {
     onSave({
       credentials_file_path: credentialsFilePath || null,
-      ssm_profile: ssmProfile || null,
       s3_profile: s3Profile || null,
       s3_bucket: s3Bucket || null,
       s3_backup_prefix: s3BackupPrefix || null,
@@ -66,36 +63,9 @@ export function SettingsScreen({ settings, isOpen, onSave, onClose }: SettingsSc
             <small className="form-hint">Leave blank to use default (~/.aws/credentials)</small>
           </div>
 
-          <div className="form-group">
-            <label htmlFor="ssm-profile">SSM profile name</label>
-            <input
-              id="ssm-profile"
-              type="text"
-              value={ssmProfile}
-              onChange={(e) => setSsmProfile(e.target.value)}
-              className="form-input"
-              autoCapitalize="none"
-              autoCorrect="off"
-              spellCheck={false}
-              placeholder="default"
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="aws-region">AWS region</label>
-            <input
-              id="aws-region"
-              type="text"
-              value={awsRegion}
-              onChange={(e) => setAwsRegion(e.target.value)}
-              className="form-input"
-              autoCapitalize="none"
-              autoCorrect="off"
-              spellCheck={false}
-              placeholder="us-east-1"
-            />
-            <small className="form-hint">Region for SSM and S3 (default: us-east-1)</small>
-          </div>
+          <small className="form-hint">
+            SSM profile and region are set per namespace: right-click a namespace → Credentials…
+          </small>
 
           <h3 className="section-title">S3 Backup</h3>
 
@@ -127,6 +97,22 @@ export function SettingsScreen({ settings, isOpen, onSave, onClose }: SettingsSc
               spellCheck={false}
               placeholder="my-backup-bucket"
             />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="aws-region">S3 region</label>
+            <input
+              id="aws-region"
+              type="text"
+              value={awsRegion}
+              onChange={(e) => setAwsRegion(e.target.value)}
+              className="form-input"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              placeholder="us-east-1"
+            />
+            <small className="form-hint">Region for S3 backups (default: us-east-1)</small>
           </div>
 
           <div className="form-group">
