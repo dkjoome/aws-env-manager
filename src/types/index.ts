@@ -4,6 +4,8 @@ export const NA_VALUE = '<NA>';
 export interface Namespace {
   id: number;
   name: string;
+  ssm_profile: string | null;
+  aws_region: string | null;
   created_at: string;
   updated_at: string;
 }

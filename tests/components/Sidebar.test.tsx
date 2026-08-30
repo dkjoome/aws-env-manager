@@ -3,8 +3,8 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { Sidebar } from '../../src/components/Sidebar';
 import type { Namespace, Project, ValidationError } from '../../src/types';
 
-const ns1: Namespace = { id: 1, name: 'my-company', created_at: '', updated_at: '' };
-const ns2: Namespace = { id: 2, name: 'another-org', created_at: '', updated_at: '' };
+const ns1: Namespace = { id: 1, name: 'my-company', ssm_profile: null, aws_region: null, created_at: '', updated_at: '' };
+const ns2: Namespace = { id: 2, name: 'another-org', ssm_profile: null, aws_region: null, created_at: '', updated_at: '' };
 
 const proj1: Project = { id: 10, namespace_id: 1, name: 'projectA', created_at: '', updated_at: '' };
 const proj2: Project = { id: 11, namespace_id: 1, name: 'projectB', created_at: '', updated_at: '' };
@@ -21,6 +21,7 @@ function renderSidebar(overrides: Partial<Parameters<typeof Sidebar>[0]> = {}) {
     awsRegion: 'us-east-1',
     onSelectNamespace: vi.fn(),
     onDeleteNamespace: vi.fn(),
+    onEditCredentials: vi.fn(),
     onManageEnvironments: vi.fn(),
     onCreateProject: vi.fn(),
     onDeleteProject: vi.fn(),
@@ -109,8 +110,16 @@ describe('Sidebar — context menus', () => {
     renderSidebar();
     fireEvent.contextMenu(screen.getByText('my-company'));
     expect(screen.getByText('+ Add project')).toBeTruthy();
+    expect(screen.getByText('Credentials…')).toBeTruthy();
     expect(screen.getByText('Manage environments')).toBeTruthy();
     expect(screen.getByText('Delete namespace')).toBeTruthy();
+  });
+
+  it('calls onEditCredentials with namespace id from context menu', () => {
+    const { props } = renderSidebar();
+    fireEvent.contextMenu(screen.getByText('my-company'));
+    fireEvent.click(screen.getByText('Credentials…'));
+    expect(props.onEditCredentials).toHaveBeenCalledWith(1);
   });
 
   it('calls onCreateProject with namespace id from context menu', () => {

@@ -11,8 +11,8 @@ import { SettingsScreen } from './components/SettingsScreen';
 import { ValidationPanel } from './components/ValidationPanel';
 import { ExportEnvDialog } from './components/ExportEnvDialog';
 import type { DbClient } from './db/client';
-import type { EnvKey } from './types';
-import { getAllNamespaces, createNamespace, deleteNamespace } from './db/repositories/namespaces';
+import type { EnvKey, Namespace } from './types';
+import { getAllNamespaces, createNamespace, deleteNamespace, updateNamespaceCredentials } from './db/repositories/namespaces';
 import { getEnvironmentsByNamespace, createEnvironment, deleteEnvironment, reorderEnvironments } from './db/repositories/environments';
 import { getProjectsByNamespace, createProject, deleteProject } from './db/repositories/projects';
 import { getKeysByProject, getKeyById, createKey, updateKey, deleteKey } from './db/repositories/keys';
@@ -23,6 +23,7 @@ import { validateLinks } from './lib/link-validator';
 import { ConfirmDialog } from './components/ConfirmDialog';
 import { InputDialog } from './components/InputDialog';
 import { CreateNamespaceDialog } from './components/CreateNamespaceDialog';
+import { NamespaceCredentialsDialog } from './components/NamespaceCredentialsDialog';
 import { ImportEnvDialog } from './components/ImportEnvDialog';
 import { CreateLinkDialog } from './components/CreateLinkDialog';
 import { ManageEnvironmentsDialog } from './components/ManageEnvironmentsDialog';
@@ -60,6 +61,7 @@ function AppShell({ db }: AppShellProps) {
     onSubmit: (value: string) => void;
   } | null>(null);
   const [showCreateNamespace, setShowCreateNamespace] = useState(false);
+  const [credsNamespaceId, setCredsNamespaceId] = useState<number | null>(null);
   const [manageEnvsNamespaceId, setManageEnvsNamespaceId] = useState<number | null>(null);
   const [showImportEnv, setShowImportEnv] = useState(false);
   const [showExportEnv, setShowExportEnv] = useState(false);
@@ -104,6 +106,21 @@ function AppShell({ db }: AppShellProps) {
       setLinkedKeyNames(names);
     });
   }, [state.keyLinks, state.keys, state.projects, db]);
+
+  // Per-namespace AWS credentials are required for all SSM operations.
+  // Returns null (and surfaces an error) when the namespace has none configured.
+  function requireNamespaceCredentials(ns: Namespace): { profile: string; region: string } | null {
+    const profile = ns.ssm_profile?.trim();
+    const region = ns.aws_region?.trim();
+    if (!profile || !region) {
+      dispatch({
+        type: 'SET_ERROR',
+        error: `No AWS credentials set for namespace "${ns.name}". Right-click the namespace → Credentials…`,
+      });
+      return null;
+    }
+    return { profile, region };
+  }
 
   function logDebug(msg: string) {
     const ts = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -176,6 +193,18 @@ function AppShell({ db }: AppShellProps) {
       const namespaces = await getAllNamespaces(db);
       dispatch({ type: 'SET_NAMESPACES', namespaces });
       await handleSelectNamespace(ns.id);
+    } catch (e) {
+      dispatch({ type: 'SET_ERROR', error: String(e) });
+    }
+  }
+
+  async function handleSaveNamespaceCredentials(ssmProfile: string, awsRegion: string) {
+    if (credsNamespaceId === null) return;
+    try {
+      await updateNamespaceCredentials(db, credsNamespaceId, ssmProfile, awsRegion);
+      const namespaces = await getAllNamespaces(db);
+      dispatch({ type: 'SET_NAMESPACES', namespaces });
+      setCredsNamespaceId(null);
     } catch (e) {
       dispatch({ type: 'SET_ERROR', error: String(e) });
     }
@@ -254,6 +283,8 @@ function AppShell({ db }: AppShellProps) {
       dispatch({ type: 'SET_ERROR', error: 'Configure AWS settings first.' });
       return;
     }
+    const creds = requireNamespaceCredentials(ns);
+    if (!creds) return;
 
     // Block if any key in the namespace is locked
     const lockedRows = await db.select<{ cnt: number }>(
@@ -272,8 +303,8 @@ function AppShell({ db }: AppShellProps) {
     try {
       const { buildNamespacePrefix } = await import('./lib/path-builder');
       remoteParams = await invoke<Array<{ path: string; value: string }>>('ssm_get_params', {
-        profile: state.settings.ssm_profile ?? 'default',
-        region: state.settings.aws_region ?? 'us-east-1',
+        profile: creds.profile,
+        region: creds.region,
         prefix: buildNamespacePrefix(ns.name),
         credentialsFilePath: state.settings.credentials_file_path ?? null,
       });
@@ -303,8 +334,8 @@ function AppShell({ db }: AppShellProps) {
           // Remote first — retryable on failure
           if (count > 0) {
             await invoke('ssm_apply_diff', {
-              profile: state.settings!.ssm_profile ?? 'default',
-              region: state.settings!.aws_region ?? 'us-east-1',
+              profile: creds.profile,
+              region: creds.region,
               diff: remoteParams.map((p) => ({ action: 'delete', path: p.path })),
               credentialsFilePath: state.settings!.credentials_file_path ?? null,
             });
@@ -355,6 +386,8 @@ function AppShell({ db }: AppShellProps) {
       dispatch({ type: 'SET_ERROR', error: 'Configure AWS settings first.' });
       return;
     }
+    const creds = requireNamespaceCredentials(ns);
+    if (!creds) return;
 
     // Block if any key in the project is locked
     const lockedRows = await db.select<{ cnt: number }>(
@@ -373,8 +406,8 @@ function AppShell({ db }: AppShellProps) {
     try {
       const { buildProjectPrefix } = await import('./lib/path-builder');
       remoteParams = await invoke<Array<{ path: string; value: string }>>('ssm_get_params', {
-        profile: state.settings.ssm_profile ?? 'default',
-        region: state.settings.aws_region ?? 'us-east-1',
+        profile: creds.profile,
+        region: creds.region,
         prefix: buildProjectPrefix(ns.name, project.name),
         credentialsFilePath: state.settings.credentials_file_path ?? null,
       });
@@ -418,8 +451,8 @@ function AppShell({ db }: AppShellProps) {
           // Remote first — retryable on failure
           if (count > 0) {
             await invoke('ssm_apply_diff', {
-              profile: state.settings!.ssm_profile ?? 'default',
-              region: state.settings!.aws_region ?? 'us-east-1',
+              profile: creds.profile,
+              region: creds.region,
               diff: remoteParams.map((p) => ({ action: 'delete', path: p.path })),
               credentialsFilePath: state.settings!.credentials_file_path ?? null,
             });
@@ -750,6 +783,8 @@ function AppShell({ db }: AppShellProps) {
       dispatch({ type: 'SET_ERROR', error: 'Select a project and configure AWS settings first.' });
       return;
     }
+    const creds = requireNamespaceCredentials(selectedNamespace);
+    if (!creds) return;
 
     setIsPushing(true);
     try {
@@ -759,11 +794,11 @@ function AppShell({ db }: AppShellProps) {
 
       const prefix = buildProjectPrefix(selectedNamespace.name, selectedProject.name);
       logDebug(`[PUSH] Querying SSM prefix: ${prefix}`);
-      logDebug(`[PUSH] Profile: ${state.settings.ssm_profile ?? 'default'}  Region: ${state.settings.aws_region ?? 'us-east-1'}`);
+      logDebug(`[PUSH] Profile: ${creds.profile}  Region: ${creds.region}`);
 
       const remoteParams = await invoke<Array<{ path: string; value: string }>>('ssm_get_params', {
-        profile: state.settings.ssm_profile ?? 'default',
-        region: state.settings.aws_region ?? 'us-east-1',
+        profile: creds.profile,
+        region: creds.region,
         prefix,
         credentialsFilePath: state.settings.credentials_file_path ?? null,
       });
@@ -793,12 +828,14 @@ function AppShell({ db }: AppShellProps) {
   }
 
   async function handleConfirmPush() {
-    if (!state.settings) return;
+    if (!state.settings || !selectedNamespace) return;
+    const creds = requireNamespaceCredentials(selectedNamespace);
+    if (!creds) return;
     try {
       logDebug(`[PUSH] Applying diff (${state.pendingDiff.length} item(s))…`);
       const result = await invoke<{ created: number; updated: number; deleted: number }>('ssm_apply_diff', {
-        profile: state.settings.ssm_profile ?? 'default',
-        region: state.settings.aws_region ?? 'us-east-1',
+        profile: creds.profile,
+        region: creds.region,
         diff: state.pendingDiff,
         credentialsFilePath: state.settings.credentials_file_path ?? null,
       });
@@ -817,6 +854,8 @@ function AppShell({ db }: AppShellProps) {
       dispatch({ type: 'SET_ERROR', error: 'Configure AWS settings first.' });
       return;
     }
+    const creds = requireNamespaceCredentials(selectedNamespace);
+    if (!creds) return;
 
     setIsSyncChecking(true);
     try {
@@ -828,8 +867,8 @@ function AppShell({ db }: AppShellProps) {
       logDebug(`[SYNC] Checking prefix: ${prefix}`);
 
       const remoteParams = await invoke<Array<{ path: string; value: string }>>('ssm_get_params', {
-        profile: state.settings.ssm_profile ?? 'default',
-        region: state.settings.aws_region ?? 'us-east-1',
+        profile: creds.profile,
+        region: creds.region,
         prefix,
         credentialsFilePath: state.settings.credentials_file_path ?? null,
       });
@@ -862,6 +901,8 @@ function AppShell({ db }: AppShellProps) {
       dispatch({ type: 'SET_ERROR', error: 'Select a project and configure AWS settings first.' });
       return;
     }
+    const creds = requireNamespaceCredentials(selectedNamespace);
+    if (!creds) return;
     // Block pull if any key is locked
     const lockedKeys = state.keys.filter((k) => k.is_locked === 1);
     if (lockedKeys.length > 0) {
@@ -879,11 +920,11 @@ function AppShell({ db }: AppShellProps) {
 
       const prefix = buildProjectPrefix(selectedNamespace.name, selectedProject.name);
       logDebug(`[PULL] Querying SSM prefix: ${prefix}`);
-      logDebug(`[PULL] Profile: ${state.settings.ssm_profile ?? 'default'}  Region: ${state.settings.aws_region ?? 'us-east-1'}`);
+      logDebug(`[PULL] Profile: ${creds.profile}  Region: ${creds.region}`);
 
       const remoteParams = await invoke<Array<{ path: string; value: string; description?: string | null }>>('ssm_get_params', {
-        profile: state.settings.ssm_profile ?? 'default',
-        region: state.settings.aws_region ?? 'us-east-1',
+        profile: creds.profile,
+        region: creds.region,
         prefix,
         credentialsFilePath: state.settings.credentials_file_path ?? null,
       });
@@ -1180,9 +1221,10 @@ function AppShell({ db }: AppShellProps) {
           projects={state.projects}
           selectedProjectId={state.selectedProjectId}
           validationErrors={state.validationErrors}
-          awsRegion={state.settings?.aws_region}
+          awsRegion={selectedNamespace?.aws_region ?? state.settings?.aws_region}
           onSelectNamespace={handleSelectNamespace}
           onDeleteNamespace={handleDeleteNamespace}
+          onEditCredentials={setCredsNamespaceId}
           onManageEnvironments={handleManageEnvironments}
           onCreateProject={handleCreateProject}
           onDeleteProject={handleDeleteProject}
@@ -1380,6 +1422,18 @@ function AppShell({ db }: AppShellProps) {
           onCancel={() => setShowCreateNamespace(false)}
         />
       )}
+
+      {credsNamespaceId !== null && (() => {
+        const ns = state.namespaces.find((n) => n.id === credsNamespaceId);
+        if (!ns) return null;
+        return (
+          <NamespaceCredentialsDialog
+            namespace={ns}
+            onSubmit={handleSaveNamespaceCredentials}
+            onCancel={() => setCredsNamespaceId(null)}
+          />
+        );
+      })()}
 
       {manageEnvsNamespaceId !== null && (
         <ManageEnvironmentsDialog

@@ -11,6 +11,7 @@ interface SidebarProps {
   awsRegion?: string | null;
   onSelectNamespace: (id: number) => void;
   onDeleteNamespace: (id: number) => void;
+  onEditCredentials: (namespaceId: number) => void;
   onManageEnvironments: (namespaceId: number) => void;
   onCreateProject: (namespaceId: number) => void;
   onDeleteProject: (id: number) => void;
@@ -38,6 +39,7 @@ export function Sidebar({
   awsRegion,
   onSelectNamespace,
   onDeleteNamespace,
+  onEditCredentials,
   onManageEnvironments,
   onCreateProject,
   onDeleteProject,
@@ -180,6 +182,12 @@ export function Sidebar({
                 onClick={() => handleContextAction(() => onCreateProject(contextMenu.id))}
               >
                 + Add project
+              </button>
+              <button
+                className="context-menu-item"
+                onClick={() => handleContextAction(() => onEditCredentials(contextMenu.id))}
+              >
+                Credentials…
               </button>
               <button
                 className="context-menu-item"

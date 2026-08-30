@@ -27,6 +27,21 @@ export async function createNamespace(db: DbClient, name: string): Promise<Names
   return ns;
 }
 
+export async function updateNamespaceCredentials(
+  db: DbClient,
+  id: number,
+  ssmProfile: string | null,
+  awsRegion: string | null
+): Promise<Namespace> {
+  await db.execute(
+    `UPDATE namespaces SET ssm_profile = ?, aws_region = ?, updated_at = datetime('now') WHERE id = ?`,
+    [ssmProfile, awsRegion, id]
+  );
+  const ns = await getNamespaceById(db, id);
+  if (!ns) throw new Error(`Namespace not found: ${id}`);
+  return ns;
+}
+
 export async function deleteNamespace(db: DbClient, id: number): Promise<void> {
   await db.execute('DELETE FROM namespaces WHERE id = ?', [id]);
 }

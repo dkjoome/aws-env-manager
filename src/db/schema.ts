@@ -4,6 +4,8 @@ PRAGMA foreign_keys = ON;
 CREATE TABLE IF NOT EXISTS namespaces (
   id          INTEGER PRIMARY KEY AUTOINCREMENT,
   name        TEXT NOT NULL UNIQUE,
+  ssm_profile TEXT,
+  aws_region  TEXT,
   created_at  TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -75,6 +77,8 @@ export const SCHEMA_STATEMENTS = [
   `CREATE TABLE IF NOT EXISTS namespaces (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     name        TEXT NOT NULL UNIQUE,
+    ssm_profile TEXT,
+    aws_region  TEXT,
     created_at  TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
   )`,
@@ -137,4 +141,6 @@ export const SCHEMA_STATEMENTS = [
 // Migrations for existing databases (ALTER TABLE won't fail if column exists in SQLite with try/catch)
 export const MIGRATIONS = [
   `ALTER TABLE keys ADD COLUMN is_locked INTEGER NOT NULL DEFAULT 0`,
+  `ALTER TABLE namespaces ADD COLUMN ssm_profile TEXT`,
+  `ALTER TABLE namespaces ADD COLUMN aws_region TEXT`,
 ];

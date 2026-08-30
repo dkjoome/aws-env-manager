@@ -127,8 +127,8 @@ export async function restoreDb(db: DbClient, data: BackupData): Promise<void> {
   // Insert in dependency order, preserving original IDs
   for (const ns of data.namespaces) {
     await db.execute(
-      'INSERT INTO namespaces (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)',
-      [ns.id, ns.name, ns.created_at, ns.updated_at]
+      'INSERT INTO namespaces (id, name, ssm_profile, aws_region, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+      [ns.id, ns.name, ns.ssm_profile ?? null, ns.aws_region ?? null, ns.created_at, ns.updated_at]
     );
   }
   for (const env of data.environments) {

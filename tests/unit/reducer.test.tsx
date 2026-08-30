@@ -32,7 +32,7 @@ function renderApp() {
   };
 }
 
-const ns: Namespace = { id: 1, name: 'ns', created_at: '', updated_at: '' };
+const ns: Namespace = { id: 1, name: 'ns', ssm_profile: null, aws_region: null, created_at: '', updated_at: '' };
 const env: Environment = { id: 10, namespace_id: 1, name: 'dev', sort_order: 0 };
 const proj: Project = { id: 100, namespace_id: 1, name: 'proj', created_at: '', updated_at: '' };
 const key: EnvKey = { id: 1000, project_id: 100, name: 'K', description: null, note: null, is_secure: 0, is_locked: 0, created_at: '', updated_at: '' };
